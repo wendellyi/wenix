@@ -212,8 +212,8 @@ DA_CCOR		EQU	9Eh	; 存在的可执行可读一致代码段属性值
 DA_LDT		    EQU	  82h	; 局部描述符表段类型值
 DA_TaskGate	    EQU	  85h	; 任务门类型值
 DA_386TSS	    EQU	  89h	; 可用 386 任务状态段类型值
-DA_386CALLGATE  EQU	  8Ch	; 386 调用门类型值
-DA_386IGate	    EQU	  8Eh	; 386 中断门类型值
+DA_386CALLGATE equ 0x8c     ; 386 调用门类型值
+DA_386INTGATE equ 0x8e      ; 386 中断门类型值
 DA_386TGate	    EQU	  8Fh	; 386 陷阱门类型值
 
 ;----------------------------------------------------------------------------
@@ -259,11 +259,11 @@ SA_TIL		EQU	4	; ┛
 ;        limit:     dd (低20比特有效)
 ;        attribute: dw (高字节的低4位总是为0)
 %macro DESCRIPTOR 3
-	dw  %2 & 0xffff                             ; 段界限1
-	dw  %1 & 0xffff                             ; 段基址1
-	db  (%1 >> 16) & 0xff                       ; 段基址2
-	dw  ((%2 >> 8) & 0xf00) | (%3 & 0xf0ff)	    ; 属性1 + 段界限2 + 属性2
-	db	(%1 >> 24) & 0xff                       ; 段基址3
+	dw  (%2) & 0xffff                               ; 段界限1
+	dw  (%1) & 0xffff                               ; 段基址1
+	db  ((%1) >> 16) & 0xff                         ; 段基址2
+	dw  (((%2) >> 8) & 0xf00) | ((%3) & 0xf0ff)	    ; 属性1 + 段界限2 + 属性2
+	db	((%1) >> 24) & 0xff                         ; 段基址3
 %endmacro
 
 ; 门
@@ -273,10 +273,10 @@ SA_TIL		EQU	4	; ┛
 ;        DCount:    db
 ;        Attr:      db
 %macro GATE 4
-	dw	(%2 & 0xffff)				        ; 偏移1
-	dw	%1                                  ; 段选择子
-	dw	(%3 & 0x1f) | ((%4 << 8) & 0xff00)	; 属性
-	dw	((%2 >> 16) & 0xffff)			    ; 偏移2
+	dw	((%2) & 0xffff)				            ; 偏移1
+	dw	(%1)                                    ; 段选择子
+	dw	((%3) & 0x1f) | (((%4) << 8) & 0xff00)	; 属性
+	dw	(((%2) >> 16) & 0xffff)			        ; 偏移2
 %endmacro
 
 ; 初始化描述符
@@ -285,11 +285,11 @@ SA_TIL		EQU	4	; ┛
     xor eax, eax
     mov ax, cs
     shl eax, 4
-    add eax, %2
-    mov word [%1+2], ax
+    add eax, (%2)
+    mov word [(%1)+2], ax
     shr eax, 16
-    mov byte [%1+4], al
-    mov byte [%1+7], ah
+    mov byte [(%1)+4], al
+    mov byte [(%1)+7], ah
 %endmacro
     
     
