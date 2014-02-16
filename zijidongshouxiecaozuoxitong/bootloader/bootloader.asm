@@ -1,5 +1,5 @@
 INITSEG equ 0x9000                  ; 把后续的代码全部都加载到这个段中
-INIT_SEC_COUNT equ 5                ; 后面有些代码有些大了，4个扇区装不下了
+INIT_SEC_COUNT equ 16               ; 后面有些代码有些大了，4个扇区装不下了
 
 org 07c00h
 mov ax, cs
@@ -31,7 +31,7 @@ print_msg:
 	ret
     
 MSGSEG:
-    db 'boot ...'
+    db 'booting ......'
 MSGSEG_END:
 
 times 510-($-$$) db 0
