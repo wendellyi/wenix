@@ -132,14 +132,16 @@ LABEL_FILE_NAME_FOUND:
     and di, 0xffe0                  ; 从当前条目开始
     add di, 0x1a                    ; 直接偏移到文件首簇号
     mov cx, word [es:di]          ; 得到这个值
-    push cx
+    push cx                         ; 将簇号存放在栈上
     add cx, ax
-    add cx, delta_sec_number
+    add cx, delta_sec_number        ; cx现在就是文件的扇区号
     mov ax, base_of_loader
     mov es, ax
-    mov bx, offset_of_loader
+    mov bx, offset_of_loader        ; es:bx文件加载地址
     mov ax, cx
     
+; ax文件扇区号
+; es:bx文件的加载地址
 LABEL_GO_ON_LOADING_FILE:
     push ax
     push bx
@@ -148,29 +150,29 @@ LABEL_GO_ON_LOADING_FILE:
     mov bl, 0x0f
     int 0x10
     
+    ; 将扇区一个一个读取出来
+    pop bx
+    pop ax
     mov cl, 1
     call read_sector
-    pop ax
+    pop ax                      ; 将簇号从栈中读出
     call get_fat_entry
-    cmp ax, 0x0fff
-    jz LABEL_FILE_LOADED
+    cmp ax, 0x0fff              ; 最后一个簇
+    jz LABEL_FILE_LOADED        ; 加载完成
     push ax
+    
+    ; 下面三条语句计算簇对应的逻辑扇区号
     mov dx, sec_count_of_root_dir
     add ax, dx
     add ax, delta_sec_number
-    add bx, [bpb_bytes_per_sec]
+    add bx, [bpb_bytes_per_sec] ; bx需要增加一个扇区的偏移读取下个扇区
     jmp LABEL_GO_ON_LOADING_FILE
 LABEL_FILE_LOADED:
-    mov dh, 1
+    mov ax, ok_msg
     call print_msg
-    
-    
+    jmp $
     jmp base_of_loader:offset_of_loader
-    
-    
-;
-;
-;    
+  
 ; 变量
 sec_number: dw 0                            ; 要读取的逻辑扇区号
 start_sec_of_root_dir equ 19                ; 根目录起始扇区号
@@ -181,7 +183,7 @@ sec_of_root_dir: dw 14                      ; 根目录占用的扇区数量
 sec_number_of_fat1 equ 1
 root_dir_loop_counter: dw sec_count_of_root_dir ; 读取根目录扇区循环计数变量
 odd_or_even: db 0                           ; 奇数还是偶数
-name_of_loader: db 'loader bin', 0          ; loader.bin的文件名
+name_of_loader: db 'loader  bin'            ; loader.bin的文件名
 str_len: dw 0
 boot_msg: db 'booting ......', 0            ; 定长，有必要吗？
 ok_msg: db   'loader ok ......', 0
@@ -207,12 +209,14 @@ err_msg: db  'no loader!', 0
 ; 1面 1磁道 18扇区
 ; ...
 ; 逻辑扇区号是从0开始的，而chs参数扇区号是从1开始的
+
+; ax存放逻辑扇区号，es:bx为存放数据的地址
 read_sector:
     push bp
     mov bp, sp
     sub esp, 2
     
-    mov byte [bp-2], cl             ; 开辟2个字节存放逻辑扇区号
+    mov byte [bp-2], cl             ; 开辟2个字节存放要读取的扇区数量
     push bx
     mov bl, [bpb_sec_per_track]
     div bl
@@ -235,39 +239,47 @@ read_sector:
     pop bp
     ret
     
+; 簇号存放在ax中
 get_fat_entry:
     push es
     push bx
     push ax
     mov ax, base_of_loader
-    sub ax, 0x0100
+    sub ax, 0x1000              ; 在base_of_loader之前空出4k空间存放fat
     mov es, ax
     pop ax
-    mov byte [odd_or_even], 0
+    ; 下面这样写得理由是每个fat表项占3/2个字节
+    mov byte [is_odd], 0  
     mov bx, 3
     mul bx
     mov bx, 2
     div bx
-    cmp dx, 0
-    jz LABEL_EVEN
-    mov byte [odd_or_even], 1
+    cmp dx, 0                   ; 是否被整除
+    jz LABEL_EVEN               ; 整除表明了起始字节数是整的，而不是办个
+    mov byte [is_odd], 1        ; ax存放商，dx存放余数
 LABEL_EVEN:
+    ; 现在ax中存放的是fat表中偏移的字节数
     xor dx, dx
-    mov bx, [bpb_bytes_per_sec]
-    div bx
+    mov bx, [bpb_bytes_per_sec]     ; 所以现在需要得到扇区偏移数
+    div bx                          ; ax存放商，dx存放余数
+                                    ; ax中是扇区偏移值，dx中是余下的字节数
+                                    ; 即扇区内偏移
     push dx
     mov bx, 0
-    add ax, sec_number_of_fat1
-    mov cl, 2
-    call read_sector
+    add ax, sec_number_of_fat1     ; fat1的起始扇区号
+    mov cl, 2                       ; 读取两个
+    call read_sector                ; 读取fat表
     pop dx
     add bx, dx
-    mov ax, [es:bx]
-    cmp byte [odd_or_even], 1
+    mov ax, [es:bx]                 ; 刚好可以读到此fat表项
+    cmp byte [is_odd], 1            ; 如果是为奇数，那么取高四位
+                                      ; 为整个表项的第四位，右移四位
     jnz LABEL_EVEN_2
     shr ax, 4
 LABEL_EVEN_2:
-    add ax, 0x0fff
+    and ax, 0x0fff                  ; 如果是偶数就happy了
+                                    ; 直接读入两个字节，然后取低12位
+                                    ; ax就含有簇号对应的值
     
 LABEL_GET_FAT_ENTRY_OK:
     pop bx
