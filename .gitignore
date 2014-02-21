@@ -79,6 +79,7 @@ build/
 *.scc
 *.bin
 *.img
+*.o
 
 # Visual C++ cache files
 ipch/
