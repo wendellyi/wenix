@@ -40,24 +40,22 @@ LABEL_START:
     xor dl, dl
     int 0x13
     
-    mov word [sec_number], start_sec_of_root_dir      ; 根目录占用的扇区数量
+    mov word [sec_number], start_sec_of_root_dir        ; 根目录起始逻辑扇区号
+
+;; 要注意下面是一个三层嵌套循环，很难理解，：）
 LABEL_SEARCH_ROOT_DIR_BEGIN:
-    cmp word [root_dir_loop_counter], 0
+    cmp word [root_dir_loop_counter], 0                 ; 检测循环计数
     jz LABEL_NO_LOADER                                  ; 没有找到loader
     dec word [root_dir_loop_counter]
     
     ; 读取一个扇区到内存
-    mov ax, base_of_loader
+    mov ax, base_of_loader      ; 不要误会，此处只是暂时使用loader的加载地址，后面这些地方会被覆盖的
     mov es, ax
     mov bx, offset_of_loader
     mov ax, [sec_number]
     mov cl, 1
     call read_sector
     
-    ; 获取字符串长度
-    mov ax, name_of_loader
-    call strlen
-    mov dx, [str_len]
     mov si, name_of_loader          ; ds:si -> "loader bin"
     mov di, offset_of_loader        ; es:di -> base_of_loader:0x0100
     cld
@@ -70,9 +68,9 @@ LABEL_SEARCH_LOADER:
     mov cx, 11                      ; 文件名必须是11字节
 LABEL_CMP_FILE_NAME:
     cmp cx, 0
-    jz LABEL_FILE_NAME_FOUND
+    jz LABEL_FILE_NAME_FOUND    ; 意味着找到了
     dec cx
-    lodsb
+    lodsb                       ; 将ds:si复制一个字节到al，而且si会自动加1
     cmp al, byte [es:di]
     jz LABEL_GO_ON                  ; 相等则继续比较
     jmp LABEL_DIFFERENT             ; 出现了差异
@@ -84,43 +82,53 @@ LABEL_GO_ON:
 LABEL_DIFFERENT:
     and di, 0xffe0                  ; 每个条目占32个字节
     add di, 0x20                    ; 这两条语句作用是让es:di指向下一条目
-    mov si, name_of_loader
+    mov si, name_of_loader          ; 将比较源重置
     jmp LABEL_SEARCH_LOADER
     
 LABEL_GOTO_NEXT_SECTOR_IN_ROOT_DIR:
     inc word [sec_number]
     jmp LABEL_SEARCH_ROOT_DIR_BEGIN
     
-
-    
 LABEL_NO_LOADER:
-    mov ax, err_msg
+    mov bp, err_msg
+    mov ax, cs
+    mov es, ax
     call print_msg   
     jmp $
-    
+
+;; es:bp存放字符串的地址
 strlen:
-    mov bx, ax
+    push bx
+    mov bx, bp
     mov word [str_len], 0
 .loop:    
-    mov al, [bx]
+    mov al, [es:bx]
     cmp al, 0
     jz .done
-    inc word [strlen]
+    inc word [str_len]
     inc bx
     jmp .loop
 .done:
+    pop bx
     ret
-    
+
+;; es:bp存放字符串
 print_msg:
-    mov bp, ax
+    push cx
+    push bx
+    push dx
     call strlen
-	mov cx, [str_len]
-	mov ax, 0x1301
-	mov bx, 0x000c
+    mov cx, [str_len]
+    mov ax, 0x1301
+    mov bx, 0x000c
     mov dh, 0
-	mov dl, 0
-	int 0x10
-	ret
+    mov dl, 0
+    int 0x10
+    pop dx
+    pop bx
+    pop cx
+    ret
+
 ; 从此处开始加载loader
 ; fat表占9个扇区，那么有512*9/1.5=307条目
 ; 根目录栈14个扇区
@@ -128,6 +136,7 @@ print_msg:
 ; 而且0号和1号簇无效，2号簇代表数据区第一个扇区（簇族）
 ; 文件的扇区号=1（引导区）+18（fat表）+14（根目录）+簇号-2
 LABEL_FILE_NAME_FOUND:
+    ;; jmp $
     mov ax, sec_count_of_root_dir
     and di, 0xffe0                  ; 从当前条目开始
     add di, 0x1a                    ; 直接偏移到文件首簇号
@@ -168,10 +177,8 @@ LABEL_GO_ON_LOADING_FILE:
     add bx, [bpb_bytes_per_sec] ; bx需要增加一个扇区的偏移读取下个扇区
     jmp LABEL_GO_ON_LOADING_FILE
 LABEL_FILE_LOADED:
-    mov ax, ok_msg
-    call print_msg
     jmp $
-    jmp base_of_loader:offset_of_loader
+;; jmp base_of_loader:offset_of_loader
   
 ; 变量
 sec_number: dw 0                            ; 要读取的逻辑扇区号
@@ -182,11 +189,11 @@ delta_sec_number equ 17;    bpb_sec_by_boot+(bpb_count_of_fat*bpb_sec_per_fat)-2
 sec_of_root_dir: dw 14                      ; 根目录占用的扇区数量
 sec_number_of_fat1 equ 1
 root_dir_loop_counter: dw sec_count_of_root_dir ; 读取根目录扇区循环计数变量
-odd_or_even: db 0                           ; 奇数还是偶数
+is_odd: db 0                           ; 奇数还是偶数
 name_of_loader: db 'loader  bin'            ; loader.bin的文件名
 str_len: dw 0
-boot_msg: db 'booting ......', 0            ; 定长，有必要吗？
-ok_msg: db   'loader ok ......', 0
+;; boot_msg: db 'booting ......', 0            ; 定长，有必要吗？
+;; ok_msg: db   'loader ok ......', 0
 err_msg: db  'no loader!', 0
 
 ; 由逻辑扇区号得到chs参数
@@ -216,7 +223,7 @@ read_sector:
     mov bp, sp
     sub esp, 2
     
-    mov byte [bp-2], cl             ; 开辟2个字节存放要读取的扇区数量
+    mov byte [bp-2], cl              ; 开辟2个字节存放要读取的扇区数量
     push bx
     mov bl, [bpb_sec_per_track]
     div bl
@@ -230,10 +237,10 @@ read_sector:
     
     mov dl, [bs_driver_number]       ; 驱动器编号
 .go_on_reading:
-    mov ah, 2                         ; 功能号将磁盘内容读到内存中
-    mov al, byte [bp-2]             ; 扇区数量
+    mov ah, 2                        ; 功能号将磁盘内容读到内存中
+    mov al, byte [bp-2]              ; 扇区数量
     int 0x13
-    jc .go_on_reading               ; 进位表示出错
+    jc .go_on_reading                ; 进位表示出错
     
     add esp, 2
     pop bp
@@ -273,16 +280,25 @@ LABEL_EVEN:
     add bx, dx
     mov ax, [es:bx]                 ; 刚好可以读到此fat表项
     cmp byte [is_odd], 1            ; 如果是为奇数，那么取高四位
-                                      ; 为整个表项的第四位，右移四位
+                                    ; 为整个表项的第四位，右移四位
     jnz LABEL_EVEN_2
     shr ax, 4
 LABEL_EVEN_2:
     and ax, 0x0fff                  ; 如果是偶数就happy了
                                     ; 直接读入两个字节，然后取低12位
                                     ; ax就含有簇号对应的值
-    
 LABEL_GET_FAT_ENTRY_OK:
     pop bx
+    pop es
+    ret
+
+PRINT_CHAR:
+    push es
+    mov ax, 0xb800
+    mov es, ax
+    mov ah, 0x0c
+    mov al, 'A'
+    mov [es:((80*3+9)*2)], ax
     pop es
     ret
 
