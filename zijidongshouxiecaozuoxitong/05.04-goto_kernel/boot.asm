@@ -1,31 +1,25 @@
 org 0x7c00
+jmp LABEL_START
 
 ; 书中的引导扇区过于复杂，而且使用的文件系统是fat12，现在似乎除了dos没有操作系统能够支持
 ; 以后内核成型了，将这一部分使用grub或者uboot代替，稳定并且可以减少工作量。
-
-bottom_of_stack equ 0x7c00
-base_of_loader equ 0x9000           ; loader.bin被加载的段地址
-offset_of_loader equ 0x0100         ; loader.bin被加载的偏移地址
-loader_sec_count equ 4
+%include "loader.inc"
 
 boot_msg:   db 'booting ......', 0
 str_len:    dw 0
-
-jmp short LABEL_START
 
 LABEL_START:
     mov ax, cs
     mov ds, ax
     mov es, ax
     mov ss, ax
-    mov sp, bottom_of_stack
+    mov sp, 0x7c00
     
     ; 复位软驱
     xor ah, ah
     xor dl, dl
     int 0x13
 
-    mov cx, loader_sec_count
     mov ax, base_of_loader
     mov es, ax
     mov bx, offset_of_loader
@@ -46,12 +40,7 @@ LABEL_START:
     dec cx
     jmp .loop
 
-LABEL_LOADED:   
-    mov bp, offset_of_loader
-    mov ax, base_of_loader
-    mov es, ax
-    call print_msg
-
+LABEL_LOADED:
     mov bp, boot_msg
     mov ax, cs
     mov es, ax

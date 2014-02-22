@@ -1,34 +1,35 @@
+;; loader的主要功能是：
+;; 1.将系统的内存信息在实模式下读取出来
+;; 2.在实模式下将kernel加载到指定的地址中
+;; 3.进入保护模式
+;; 4.将内存的信息显示出来
+;; 5.开启分页
+;; 6.将kernel的代码移动到正确的地方，然后跳转到kernel中
+
 jmp LABEL_START
 
-%include "../pm.inc"
-%include "loader.inc"
+%include "pm.inc"           ; 与保护模式相关的宏
+%include "loader.inc"       ; 与loader相关的宏
 
 LABEL_GDT:              DESCRIPTOR 0, 0, 0
 LABEL_DESC_FLAT_CODE:   DESCRIPTOR 0, 0xffffff, DA_CR|DA_32|DA_LIMIT_4K
 LABEL_DESC_FLAT_RW:     DESCRIPTOR 0, 0xffffff, DA_DRW|DA_32|DA_LIMIT_4K
 LABEL_DESC_VIDEO:       DESCRIPTOR 0xb8000, 0xffff, DA_DRW|DA_DPL3
 
-gdt_len equ $-LABEL_GDT
-gdt_ptr dw gdt_len-1
-        dd logic_addr_of_loader+LABEL_GDT
+gdt_len equ $-LABEL_GDT         ; gdt长度
+gdt_ptr dw gdt_len-1            ; gdt段界限
+        dd logic_addr_of_loader+LABEL_GDT ; 段基址
         
 selector_flat_code equ LABEL_DESC_FLAT_CODE-LABEL_GDT
 selector_flat_rw equ LABEL_DESC_FLAT_RW-LABEL_GDT
 selector_video equ LABEL_DESC_VIDEO-LABEL_GDT
-
-kernel_start_sec_number equ 5               ; 内核模块从洛基山区号为5的地方开始读入
-bottom_of_stack equ 0x9500
-kernel_sec_count equ 4
-
-boot_msg:   db 'kernel loaded ......', 0
-str_len:    dw 0
 
 LABEL_START:
     mov ax, cs
     mov ds, ax
     mov es, ax
     mov ss, ax
-    mov sp, ax
+    mov sp, rm_bottom_of_stack
     
     ; 复位软驱
     xor ah, ah
@@ -130,3 +131,43 @@ read_sector:
     add esp, 2
     pop bp
     ret
+[section .data]
+align 32
+[bits 32]
+LABEL_DATA:
+_pm_msg: db "in protect mode now ...", 0x0a, 0x0a, 0
+_mem_chk_title: db "base_addr_low base_addr_hig length_low length_hig type", 0x0a, 0
+_ram_size_prifix: db "ram size: ", 0
+_return_string: db 0x0a, 0
+
+_sp_in_real_mode: dw 0
+_mem_chk_result: dd 0
+_display_position: dd (80*6+0)*2            ; 显示信息的位置
+_mem_size: dd 0
+_ard_struct:
+    _base_addr_low: dd 0
+    _base_addr_hig: dd 0
+    _length_low: dd 0
+    _length_hig: dd 0
+    _ard_type: dd 0
+ard_struct_size equ $-_ard_struct
+    
+_mem_chk_buffer: times 256 db 0
+
+pm_msg equ _pm_msg-$$
+mem_chk_title equ logic_addr_of_loader+_mem_chk_title
+ram_size_prefix equ logic_addr_of_loader+_ram_size_prifix
+return_string equ logic_addr_of_loader+_return_string
+display_position equ logic_addr_of_loader+_display_position
+mem_size equ logic_addr_of_loader+_mem_size
+mem_chk_result equ logic_addr_of_loader+_mem_chk_result
+ard_struct equ logic_addr_of_loader+_ard_struct
+    base_addr_low equ logic_addr_of_loader+_base_addr_low
+    base_addr_hig equ logic_addr_of_loader+_base_addr_hig
+    length_low equ logic_addr_of_loader+_length_low
+    length_hig equ logic_addr_of_loader+_length_hig
+    ard_type equ logic_addr_of_loader+_ard_type
+mem_chk_buffer equ logic_addr_of_loader+_mem_chk_buffer
+
+pm_stack:   times 0x1000 db 0
+bottom_of_stack equ logic_addr_of_loader+$
