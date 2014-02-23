@@ -478,14 +478,14 @@ align 32
 [bits 32]
 LABEL_DATA:
 _pm_msg: db "in protect mode now ...", 0x0a, 0x0a, 0
-_mem_chk_title: db "base_addr_low base_addr_hig length_low length_hig type", 0x0a, 0
+_mem_chk_title: db "base_low  base_hig  len_low   len_hig   type", 0x0a, 0
 _ram_size_prifix: db "ram size: ", 0
 _no_kernel_msg: db "no kernel!", 0
 _return_string: db 0x0a, 0
 
 _sp_in_real_mode: dw 0
 _mem_chk_result: dd 0
-_display_position: dd (80*6+0)*2            ; 显示信息的位置
+_display_position: dd (80*2+0)*2            ; 显示信息的位置
 _mem_size: dd 0
 _ard_struct:
     _base_addr_low: dd 0
