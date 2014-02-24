@@ -3,7 +3,7 @@ jmp LABEL_START
 
 ; 书中的引导扇区过于复杂，而且使用的文件系统是fat12，现在似乎除了dos没有操作系统能够支持
 ; 以后内核成型了，将这一部分使用grub或者uboot代替，稳定并且可以减少工作量。
-%include "loader.inc"
+%include "include/loader.inc"
 
 boot_msg:   db 'booting ......', 0
 str_len:    dw 0

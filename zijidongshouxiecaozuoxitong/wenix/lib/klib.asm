@@ -43,6 +43,43 @@ display_string:
     pop ebp
     ret
 
+;; void display_color_string(char* string, int color);
+display_color_string:
+    push ebp
+    mov ebp, esp
+
+    mov esi, [ebp+8]            ; string
+    mov edi, [display_position]
+    mov ah, [ebp+12]            ; color
+
+.1:
+    lodsb
+    test al, al                 ; 测试终止字符
+    jz .2
+    cmp al, 0x0a
+    jnz .3
+    push eax
+    mov eax, edi
+    mov bl, 160
+    div bl
+    and eax, 0xff
+    inc eax
+    mov bl, 160
+    mul bl
+    mov edi, eax
+    pop eax
+    jmp .1
+.3:
+    mov [gs:edi], ax
+    add edi, 2
+    jmp .1
+.2:
+    mov [display_position], edi
+
+    mov esp, ebp
+    pop ebp
+    ret
+
 ;; 注意下面这两个函数没有使用ebp，与常见的不太一样
 ;; void out_byte(u16 port, u8 value);
 out_byte:

@@ -9,8 +9,8 @@
 org 0x0100                  ; 默认的偏移是必须的
 jmp LABEL_START
 
-%include "pm.inc"           ; 与保护模式相关的宏
-%include "loader.inc"       ; 与loader相关的宏
+%include "include/protect.inc"      ; 与保护模式相关的宏
+%include "include/loader.inc"       ; 与loader相关的宏
 
 LABEL_GDT:              DESCRIPTOR 0, 0, 0
 LABEL_DESC_FLAT_CODE:   DESCRIPTOR 0, 0xffffff, (DA_CR|DA_32|DA_LIMIT_4K)
