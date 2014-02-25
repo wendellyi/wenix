@@ -4,8 +4,6 @@
 #include "global.h"
 #include "proto.h"              /* 真不知道这个名称代表何意 */
 
-
-
 static void init_idt_desc(u8 vector, u8 type, void (*handler) (void), u8 privilege)
 {
     struct GATE* gate = &idt[vector];
@@ -16,8 +14,6 @@ static void init_idt_desc(u8 vector, u8 type, void (*handler) (void), u8 privile
     gate->attribute = type | (privilege << 5);
     gate->offset_high = (base >> 16) & 0xffff;
 }
-
-void zero_divided(void);
 
 void init_interrupt(void)
 {
@@ -44,15 +40,34 @@ void init_interrupt(void)
     init_idt_desc(INT_VECTOR_GP, DA_386INTGATE, general_protection, DPL_KERNEL);
     init_idt_desc(INT_VECTOR_PAGE_FAULT, DA_386INTGATE, page_fault, DPL_KERNEL);
     init_idt_desc(INT_VECTOR_COPROC_ERROR, DA_386INTGATE, coproc_error, DPL_KERNEL);
+
+    /* 外部硬件中断 */
+    init_idt_desc(INT_VECTOR_IRQ0+0, DA_386INTGATE, hwint00, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ0+1, DA_386INTGATE, hwint01, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ0+2, DA_386INTGATE, hwint02, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ0+3, DA_386INTGATE, hwint03, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ0+4, DA_386INTGATE, hwint04, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ0+5, DA_386INTGATE, hwint05, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ0+6, DA_386INTGATE, hwint06, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ0+7, DA_386INTGATE, hwint07, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ8+0, DA_386INTGATE, hwint08, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ8+1, DA_386INTGATE, hwint09, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ8+2, DA_386INTGATE, hwint10, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ8+3, DA_386INTGATE, hwint11, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ8+4, DA_386INTGATE, hwint12, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ8+5, DA_386INTGATE, hwint13, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ8+6, DA_386INTGATE, hwint14, DPL_KERNEL);
+    init_idt_desc(INT_VECTOR_IRQ8+7, DA_386INTGATE, hwint15, DPL_KERNEL);
 }
 
+/* 异常处理函数，向屏幕输出重要寄存器的值 */
 void exception_handler(
     int irq, int err_code, int eip, int cs, int eflags)
 {
     int i;
     int text_color = 0x74;      /* 灰底红字 */
 
-	char * err_msg[] ={
+	char * err_msg[] = {
         "#DE Divide Error",
         "#DB RESERVED",
         "--  NMI Interrupt",
@@ -75,29 +90,28 @@ void exception_handler(
         "#XF SIMD Floating-Point Exception"
     };
 
-	/* 通过打印空格的方式清空屏幕的前五行，并把 disp_pos 清零 */
-	disp_pos = 0;
-	for(i=0;i<80*5;i++){
-		disp_str(" ");
+	/* 通过打印空格的方式清空屏幕 */
+	display_position = 0;
+	for(i = 0; i < 80*5; i++)
+        display_string("");
+
+    display_position = 0;
+
+	display_color_string("Exception! --> ", text_color);
+	display_color_string(err_msg[irq], text_color);
+	display_color_string("\n\n", text_color);
+	display_color_string("EFLAGS:", text_color);
+    display_int(eflags);
+	display_color_string("CS:", text_color);
+    display_int(cs);
+	display_color_string("EIP:", text_color);
+    display_int(eip);
+
+    /* 如果是错误码将不等于我们填充的值 */
+	if(err_code != 0xFFFFFFFF)
+    {
+		display_color_string("Error Code:", text_color);
+        display_int(err_code);
+        display_string("\n\n");
 	}
-	disp_pos = 0;
-
-	disp_color_str("Exception! --> ", text_color);
-	disp_color_str(err_msg[vec_no], text_color);
-	disp_color_str("\n\n", text_color);
-	disp_color_str("EFLAGS:", text_color);
-	disp_int(eflags);
-	disp_color_str("CS:", text_color);
-	disp_int(cs);
-	disp_color_str("EIP:", text_color);
-	disp_int(eip);
-
-	if(err_code != 0xFFFFFFFF){
-		disp_color_str("Error code:", text_color);
-		disp_int(err_code);
-	}    char* err_msg[] = {
-        "#DB RESERVED",
-        "-- NMI Interrupt",
-        "#OF Overflow",
-    };
 }
