@@ -1,5 +1,8 @@
 SELECTOR_KERNEL_CS equ 8
 
+extern spurious_irq
+extern exception_handler
+
 [section .text]
 global zero_divided
 global single_step
@@ -81,35 +84,35 @@ hwint07:
 %endmacro
 
 align 16
-hwint08                         ; 实时时钟
+hwint08:                        ; 实时时钟
     hwint_slave 8
 
 align 16                        ;
-hwint09
+hwint09:
     hwint_slave 9
 
 align 16                        ;
-hwint10
+hwint10:
     hwint_slave 10
 
 align 16                        ;
-hwint11
+hwint11:
     hwint_slave 11
 
 align 16                        ;
-hwint12
+hwint12:
     hwint_slave 12
 
 align 16
-hwint13
+hwint13:
     hwint_slave 13              ; fpu异常
 
 align 16
-hwint14
+hwint14:
     hwint_slave 14
 
 align 16                        ;
-hwint15
+hwint15:
     hwint_slave 15
 
 ;; 中断与异常，压入0xffffffff表示没有错误码
@@ -166,7 +169,7 @@ invalid_tss:
     push 10
     jmp exception
 
-segment_not_present
+segment_not_present:
     push 11
     jmp exception
 

@@ -1,5 +1,21 @@
-all:
-	cd ../lib && make && cd -
-	nasm -f elf -o kernel.o kernel.asm
-	gcc -c -o start.o start.c -Wall
-	ld -m elf_i386 -s -Ttext 0x30400 -o kernel.bin kernel.o ../lib/string.o ../lib/klib.o start.o
+ASM := nasm
+ASM_OPTION := -f elf
+ASM_OUTPUT_OPTION := -o
+
+CC := gcc
+CC_OPTION := -c -Wall
+CFLAGS := -I../include
+CC_OUTPUT_OPTION := -o
+
+all: kernel.o start.o i8259a.o irq.o protect.o
+
+%.o: %.asm
+	$(ASM) $(ASM_OPTION) $< $(ASM_OUTPUT_OPTION) $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) $(CC_OPTION) $< $(CC_OUTPUT_OPTION) $@
+
+.PHONY: all clean
+
+clean:
+	rm -f *.o

@@ -1,3 +1,5 @@
+#include "irq.h"
+
 void init_8259a(void)
 {
     /* master 8259 icw1 */
@@ -30,4 +32,11 @@ void init_8259a(void)
 
     /* slave 8259 ocw1 */
     out_byte(INT_S_CTL_MASK, 0xff);
+}
+
+void spurious_irq(int irq)
+{
+    display_string("spurious_irq: ");
+    display_int(irq);
+    display_string("\n");
 }

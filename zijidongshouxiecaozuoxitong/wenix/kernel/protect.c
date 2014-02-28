@@ -2,7 +2,9 @@
 #include "const.h"
 #include "protect.h"
 #include "global.h"
-#include "proto.h"              /* 真不知道这个名称代表何意 */
+#include "irq.h"
+
+
 
 static void init_idt_desc(u8 vector, u8 type, void (*handler) (void), u8 privilege)
 {
